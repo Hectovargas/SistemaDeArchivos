@@ -1,5 +1,5 @@
 CMakeFiles/blockdevice.dir/Interfaz.cpp.o: \
- /home/fefo/Documentos/estru\ 2/proyectos/Proyeto\ blockDevice/Interfaz.cpp \
+ /home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto\ blockDevice/Interfaz.cpp \
  /usr/include/stdc-predef.h /usr/include/c++/14.2.0/iostream \
  /usr/include/c++/14.2.0/bits/requires_hosted.h \
  /usr/include/c++/14.2.0/x86_64-unknown-linux-gnu/bits/c++config.h \
@@ -168,8 +168,8 @@ CMakeFiles/blockdevice.dir/Interfaz.cpp.o: \
  /usr/include/c++/14.2.0/bits/stl_vector.h \
  /usr/include/c++/14.2.0/bits/stl_bvector.h \
  /usr/include/c++/14.2.0/bits/vector.tcc \
- /home/fefo/Documentos/estru\ 2/proyectos/Proyeto\ blockDevice/filesystem.hpp \
- /home/fefo/Documentos/estru\ 2/proyectos/Proyeto\ blockDevice/BlockDevice.hpp \
+ /home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto\ blockDevice/filesystem.hpp \
+ /home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto\ blockDevice/BlockDevice.hpp \
  /usr/include/c++/14.2.0/fstream /usr/include/c++/14.2.0/bits/codecvt.h \
  /usr/include/c++/14.2.0/x86_64-unknown-linux-gnu/bits/basic_file.h \
  /usr/include/c++/14.2.0/x86_64-unknown-linux-gnu/bits/c++io.h \

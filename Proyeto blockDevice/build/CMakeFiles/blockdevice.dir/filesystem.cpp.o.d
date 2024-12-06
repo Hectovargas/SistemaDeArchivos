@@ -1,8 +1,8 @@
 CMakeFiles/blockdevice.dir/filesystem.cpp.o: \
- /home/fefo/Documentos/estru\ 2/proyectos/Proyeto\ blockDevice/filesystem.cpp \
+ /home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto\ blockDevice/filesystem.cpp \
  /usr/include/stdc-predef.h \
- /home/fefo/Documentos/estru\ 2/proyectos/Proyeto\ blockDevice/filesystem.hpp \
- /home/fefo/Documentos/estru\ 2/proyectos/Proyeto\ blockDevice/BlockDevice.hpp \
+ /home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto\ blockDevice/filesystem.hpp \
+ /home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto\ blockDevice/BlockDevice.hpp \
  /usr/include/c++/14.2.0/iostream \
  /usr/include/c++/14.2.0/bits/requires_hosted.h \
  /usr/include/c++/14.2.0/x86_64-unknown-linux-gnu/bits/c++config.h \

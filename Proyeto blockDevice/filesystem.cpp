@@ -92,7 +92,47 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
 
 std::string SistemaArchivos::cat(const std::string &name)
 {
-    return "";
+    std::fstream archivo(nfile, std::ios::in | std::ios::binary);
+    if (!archivo.is_open())
+    {
+        std::cerr << "No se pudo abrir el archivo." << std::endl;
+        return "Error: No se pudo abrir el archivo.";
+    }
+
+    leerFileTable(archivo); // Lee la tabla de archivos desde el disco
+    std::string texto;
+
+    for (const Inodo &nodo : fileTable)
+    {
+        std::cout << "1";
+        if (std::string(nodo.name) == name)
+        {
+            std::cout << "2";
+            //std::cout << nodo.Apuntadores[0];
+            for (size_t ptr : nodo.Apuntadores)
+            {
+                std::cout << "3";
+                if (ptr >= Bcount * Bsize)
+                {
+                    std::cerr << "Error: Apuntador fuera de rango." << std::endl;
+                    return "Error: Archivo corrupto.";
+                }
+
+                archivo.seekg(ptr); 
+                std::vector<char> buffer(Bsize, '\0');
+                archivo.read(buffer.data(), Bsize);
+
+                for (char c : buffer)
+                {
+                    if (c == '\0') 
+                        return texto;
+                    texto += c;
+                }
+            }
+        }
+    }
+
+    return texto.empty() ? "Error: No se encontró el archivo." : texto;
 }
 
 bool SistemaArchivos::copyOut(const std::string &file1, const std::string &file2)

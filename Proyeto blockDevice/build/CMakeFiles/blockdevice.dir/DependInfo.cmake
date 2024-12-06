@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice/Interfaz.cpp" "CMakeFiles/blockdevice.dir/Interfaz.cpp.o" "gcc" "CMakeFiles/blockdevice.dir/Interfaz.cpp.o.d"
-  "/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice/filesystem.cpp" "CMakeFiles/blockdevice.dir/filesystem.cpp.o" "gcc" "CMakeFiles/blockdevice.dir/filesystem.cpp.o.d"
+  "/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice/Interfaz.cpp" "CMakeFiles/blockdevice.dir/Interfaz.cpp.o" "gcc" "CMakeFiles/blockdevice.dir/Interfaz.cpp.o.d"
+  "/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice/filesystem.cpp" "CMakeFiles/blockdevice.dir/filesystem.cpp.o" "gcc" "CMakeFiles/blockdevice.dir/filesystem.cpp.o.d"
   "" "blockdevice" "gcc" "CMakeFiles/blockdevice.dir/link.d"
   )
 

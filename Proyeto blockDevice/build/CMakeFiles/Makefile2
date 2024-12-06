@@ -54,10 +54,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice"
+CMAKE_SOURCE_DIR = "/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice"
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice/build"
+CMAKE_BINARY_DIR = "/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice/build"
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -85,14 +85,14 @@ clean: CMakeFiles/blockdevice.dir/clean
 CMakeFiles/blockdevice.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/blockdevice.dir/build.make CMakeFiles/blockdevice.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/blockdevice.dir/build.make CMakeFiles/blockdevice.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice/build/CMakeFiles" --progress-num=1,2,3 "Built target blockdevice"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir="/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice/build/CMakeFiles" --progress-num=1,2,3 "Built target blockdevice"
 .PHONY : CMakeFiles/blockdevice.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/blockdevice.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start "/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice/build/CMakeFiles" 3
+	$(CMAKE_COMMAND) -E cmake_progress_start "/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice/build/CMakeFiles" 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/blockdevice.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start "/home/fefo/Documentos/estru 2/proyectos/Proyeto blockDevice/build/CMakeFiles" 0
+	$(CMAKE_COMMAND) -E cmake_progress_start "/home/fefo/Documentos/GitHub/SistemaDeArchivos/Proyeto blockDevice/build/CMakeFiles" 0
 .PHONY : CMakeFiles/blockdevice.dir/rule
 
 # Convenience name for target.
