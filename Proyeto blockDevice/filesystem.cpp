@@ -11,8 +11,7 @@ bool SistemaArchivos::format()
 
     MapaDeBloquesLibres.assign(Bcount, true);
 
-    size_t superbloqueLong = ceil(sizeof(Bsize) + sizeof(Bcount) + sizeof(MapaDeBloquesLibres) + 35072) / Bsize;
-
+    
     for (int i = 0; i <= superbloqueLong; i++)
     {
         MapaDeBloquesLibres[i] = false;
@@ -49,20 +48,19 @@ bool SistemaArchivos::format()
 
 bool SistemaArchivos::writeFile(const std::string &name, const std::string &data)
 {
-
-    std::fstream archivo(nfile);
+    std::fstream archivo(nfile, std::ios::in | std::ios::out | std::ios::binary);
     if (!archivo.is_open())
     {
-        std::cout << "Sistema de bloques no encontrado" << std::endl;
+        std::cerr << "Sistema de bloques no encontrado." << std::endl;
         return false;
     }
 
     leerMapa(archivo);
     leerFileTable(archivo);
 
-    for (Inodo i : fileTable)
+    for (Inodo &i : fileTable) // Uso de referencia para modificar directamente
     {
-        if (!i.isFree && i.name == name)
+        if (!i.isFree && std::string(i.name) == name)
         {
             i.size += data.size();
             AsignarBloques(archivo, data.size(), name, data, false);
@@ -72,21 +70,23 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
         }
     }
 
-    // si no encuentra el archivo
-    // Archivo nuevo
-    for (int i = 0; i < fileTable.size(); i++)
+    // Si no encuentra el archivo, crea uno nuevo
+    for (Inodo &i : fileTable)
     {
-        if (fileTable[i].isFree)
+        if (i.isFree)
         {
-            std::strcpy(fileTable[i].name, name.c_str());
-            fileTable[i].isFree = false;
-            fileTable[i].size = data.size();
+            std::strncpy(i.name, name.c_str(), sizeof(i.name) - 1);
+            i.name[sizeof(i.name) - 1] = '\0'; // Garantizar terminación nula
+            i.isFree = false;
+            i.size = data.size();
             AsignarBloques(archivo, data.size(), name, data, true);
             GuardarFiletable(archivo);
             GuardarMapa(archivo);
             return true;
         }
     }
+
+    std::cerr << "Error: No se pueden crear más archivos, tabla llena." << std::endl;
     return false;
 }
 
@@ -104,14 +104,13 @@ std::string SistemaArchivos::cat(const std::string &name)
 
     for (const Inodo &nodo : fileTable)
     {
-        std::cout << "1";
+
         if (std::string(nodo.name) == name)
         {
-            std::cout << "2";
-            //std::cout << nodo.Apuntadores[0];
+
             for (size_t ptr : nodo.Apuntadores)
             {
-                std::cout << "3";
+
                 if (ptr >= Bcount * Bsize)
                 {
                     std::cerr << "Error: Apuntador fuera de rango." << std::endl;
@@ -161,8 +160,14 @@ void SistemaArchivos::listFiles()
         { // Si el inodo está ocupado, significa que representa un archivo.
             archivosEncontrados = true;
             std::cout << "- Nombre: " << inodo.name
-                      << ", Tamaño: " << inodo.size << " bytes"
-                      << std::endl;
+                      << ", Tamaño: " << inodo.size << " bytes ";
+                      for (int i = 0; i < inodo.Apuntadores.size(); i++)
+                      {
+                        std::cout << i << ". offset: " << inodo.Apuntadores[i] << " - " << std::endl;
+                        std::cout << i << ". bloque: " << floor(inodo.Apuntadores[i]/Bsize) << " - " << std::endl;
+                      }
+                      
+                     std::cout << std::endl;
         }
     }
 
@@ -174,12 +179,13 @@ void SistemaArchivos::listFiles()
 
 std::size_t SistemaArchivos::getNextFreeBlock()
 {
+    
     for (std::size_t i = 0; i < MapaDeBloquesLibres.size(); ++i)
     {
-        if (MapaDeBloquesLibres[i]) // Si el bloque está libre (valor true)
+        if (MapaDeBloquesLibres[i]) 
         {
-            MapaDeBloquesLibres[i] = false; // Marca el bloque como ocupado
-            return i;                       // Retorna el índice del bloque libre
+            MapaDeBloquesLibres[i] = false; 
+            return i;                       
         }
     }
 
@@ -242,7 +248,7 @@ void SistemaArchivos::GuardarMapa(std::fstream &archivo)
     }
 }
 
-void SistemaArchivos::AsignarApuntadores(std::string &name, std::vector<size_t> &apunts)
+void SistemaArchivos::AsignarApuntadores(std::string name, std::vector<size_t> &apunts)
 {
     for (int i = 0; i < 256; i++)
     {
@@ -253,88 +259,87 @@ void SistemaArchivos::AsignarApuntadores(std::string &name, std::vector<size_t> 
     }
 }
 
-void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, std::string name, std::string data, bool nuevo)
+void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo)
 {
+    std::vector<size_t> bloquesAsignados;
+    size_t dataPos = 0;
+
+    // Encuentra el último bloque asignado al archivo si ya existe
+    size_t ultimoBloqueUsado = static_cast<size_t>(-1);
+    size_t espacioDisponibleEnUltimoBloque = 0;
+
+    for (Inodo &i : fileTable)
+    {
+        if (std::string(i.name) == name && !nuevo && !i.Apuntadores.empty())
+        {
+            ultimoBloqueUsado = i.Apuntadores.back() / Bsize;
+            espacioDisponibleEnUltimoBloque = Bsize - blockisCompleto(i.Apuntadores.back());
+            break;
+        }
+    }
+
+    // Comienza a escribir los datos
+    while (dataPos < data.size())
+    {
+        size_t bytesToWrite;
+
+        if (ultimoBloqueUsado != static_cast<size_t>(-1) && espacioDisponibleEnUltimoBloque > 0)
+        {
+            // Si el último bloque tiene espacio, escribe allí
+            bytesToWrite = std::min(data.size() - dataPos, espacioDisponibleEnUltimoBloque);
+
+            archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque));
+            archivo.write(data.data() + dataPos, bytesToWrite);
+
+            espacioDisponibleEnUltimoBloque -= bytesToWrite;
+            dataPos += bytesToWrite;
+        }
+        else
+        {
+            // Si no hay bloques disponibles o el último está lleno, asigna uno nuevo
+            size_t bloqueLibre = getNextFreeBlock();
+            if (bloqueLibre == static_cast<size_t>(-1))
+            {
+                std::cerr << "Error: No hay bloques libres disponibles." << std::endl;
+                return;
+            }
+
+            bloquesAsignados.push_back(bloqueLibre * Bsize);
+
+            bytesToWrite = std::min(data.size() - dataPos, static_cast<size_t>(Bsize));
+            archivo.seekp(bloqueLibre * Bsize);
+            archivo.write(data.data() + dataPos, bytesToWrite);
+
+            // Llena el resto del bloque con ceros si es necesario
+            if (bytesToWrite < Bsize)
+            {
+                std::vector<char> padding(Bsize - bytesToWrite, '\0');
+                archivo.write(padding.data(), padding.size());
+            }
+
+            dataPos += bytesToWrite;
+            ultimoBloqueUsado = bloqueLibre;
+            espacioDisponibleEnUltimoBloque = Bsize - bytesToWrite;
+        }
+    }
+
+    // Asigna los bloques al archivo
     if (nuevo)
     {
-        std::vector<size_t> temp;
-        int e;
-        int posIsubstr = 0;
-
-        for (int i = 0; i <= Bcount; i++)
-        {
-            if (MapaDeBloquesLibres[i] == true)
-            {
-                e = i;
-            }
-            for (int i = e; i < e + ceil(final / Bsize); i++)
-            {
-
-                MapaDeBloquesLibres[i] = false;
-                //--------------------------------------------------------------------------------------------------------------------------------
-                temp.push_back(i * Bsize);
-
-                if (data.size() > Bsize && data.size() < posIsubstr + Bsize)
-                {
-
-                    int posFinal = data.size() - (floor(data.size() / Bsize) * Bsize);
-                    for (int j = 0; j < posFinal; j++)
-                    {
-                        data.append("\0");
-                    }
-
-                    escribirBloques(archivo, i * Bsize, (i * Bsize) + data.size(), data.substr(posIsubstr, posFinal));
-                }
-                else if (data.size() > Bsize && data.size() > posIsubstr + Bsize)
-                {
-
-                    escribirBloques(archivo, i * Bsize, (i * Bsize) + data.size(), data.substr(posIsubstr, Bsize));
-                }
-                else if (data.size() <= Bsize)
-                {
-                    for (int j = data.size(); j < Bsize; j++)
-                    {
-                        data.append("\0");
-                    }
-                    escribirBloques(archivo, i * Bsize, (i * Bsize) + data.size(), data);
-                }
-            }
-            AsignarApuntadores(name, temp);
-        }
+        AsignarApuntadores(name, bloquesAsignados);
     }
     else
     {
-        size_t ultimo;
-        size_t pos;
-
-        for (size_t i = 0; i < 256; i++)
+        for (Inodo &i : fileTable)
         {
-            if (fileTable[i].name == name)
+            if (std::string(i.name) == name)
             {
-                ultimo = fileTable[i].Apuntadores.back();
-                pos = blockisCompleto(ultimo);
-                if (pos != 0)
-                {
-                    archivo.seekp(ultimo + pos);
-                    if (Bsize >= pos + data.size())
-                    {
-                        archivo.write(reinterpret_cast<char *>(&data), sizeof(data));
-                    }
-                    else
-                    {
-                        std::string text = data.substr(0, Bsize - pos);
-                        archivo.write(reinterpret_cast<char *>(&text), (Bsize - pos));
-                        AsignarBloques(archivo, ultimo + (Bsize - pos), name, data.substr(Bsize - pos, data.size()), true);
-                    }
-                }
-                else
-                {
-                    AsignarBloques(archivo, ultimo, name, data, true);
-                }
+                i.Apuntadores.insert(i.Apuntadores.end(), bloquesAsignados.begin(), bloquesAsignados.end());
             }
         }
     }
 }
+
 
 size_t SistemaArchivos::calcularInicio(std::string &name, size_t punteroActual)
 {
@@ -361,10 +366,15 @@ size_t SistemaArchivos::calcularfinal(std::string &name)
     return 0;
 }
 
-void SistemaArchivos::escribirBloques(std::fstream &archivo, size_t inicio, size_t final, std::string data)
+void SistemaArchivos::escribirBloques(std::fstream &archivo, size_t inicio, size_t final, const std::string &data)
 {
     archivo.seekp(inicio);
-    archivo.write(reinterpret_cast<char *>(&data), sizeof(data));
+    archivo.write(data.c_str(), data.size());
+    if (data.size() < (final - inicio))
+    {
+        std::vector<char> padding((final - inicio) - data.size(), '\0');
+        archivo.write(padding.data(), padding.size());
+    }
 }
 
 size_t SistemaArchivos::blockisCompleto(size_t offset)
