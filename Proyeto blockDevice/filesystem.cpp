@@ -5,7 +5,7 @@ bool SistemaArchivos::format()
     std::fstream archivo(nfile);
     if (!archivo.is_open())
     {
-        std::cout << "Sistema de bloques no encontrado" << std::endl;
+        std::cout << "\033[31m" << "Sistema de bloques no encontrado\033[0m" << std::endl;
         return false;
     }
 
@@ -41,7 +41,7 @@ bool SistemaArchivos::format()
     }
 
     archivo.close();
-    std::cout << "Sistema de archivos formateado con éxito." << std::endl;
+
     return true;
 }
 
@@ -49,23 +49,19 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
 {
     if (name.size() > 64)
     {
-        std::cout << "Nombre de archivo demasiado largo" << std::endl;
+        std::cout << "\033[31m" << "Nombre de archivo demasiado largo\033[0m" << std::endl;
         return false;
     }
 
     std::fstream archivo(nfile, std::ios::in | std::ios::out | std::ios::binary);
     if (!archivo.is_open())
     {
-        std::cerr << "Sistema de bloques no encontrado." << std::endl;
+        std::cerr << "\033[31m" << "Sistema de bloques no encontrado.\033[0m" << std::endl;
         return false;
     }
 
-    std::cout << 1 << std::endl;
-
     leerMapa(archivo);
     leerFileTable(archivo);
-
-    std::cout << 2 << std::endl;
 
     for (Inodo &i : fileTable)
     {
@@ -78,8 +74,6 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
             return true;
         }
     }
-
-    std::cout << 3 << std::endl;
 
     for (Inodo &i : fileTable)
     {
@@ -96,8 +90,7 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
         }
     }
 
-    std::cout << 4 << std::endl;
-    std::cerr << "Error: No se pueden crear más archivos, tabla llena." << std::endl;
+    std::cerr << "\033[31m" << "Error: No se pueden crear más archivos, tabla llena.\033[0m" << std::endl;
     return false;
 }
 
@@ -125,8 +118,8 @@ std::string SistemaArchivos::cat(const std::string &name)
                 {
                     if (ptr >= Bcount * Bsize)
                     {
-                        std::cerr << "Error: Apuntador fuera de rango." << std::endl;
-                        return "Error: Archivo corrupto.";
+                        std::cerr << "\033[31m" << "Error: Apuntador fuera de rango.\033[0m" << std::endl;
+                        return "\033[31m  Error: Archivo corrupto.\033[0m";
                     }
 
                     archivo.seekg(ptr);
@@ -144,17 +137,71 @@ std::string SistemaArchivos::cat(const std::string &name)
         }
     }
 
-    return texto.empty() ? "Error: No se encontró el archivo." : texto;
+    return texto.empty() ? " \033[31m Error: No se encontró el archivo.\033[0m" : texto;
 }
 
 bool SistemaArchivos::copyOut(const std::string &file1, const std::string &file2)
 {
-    return false;
+    std::string contenido = cat(file1);
+    if (contenido.empty() || contenido.find("Error") != std::string::npos)
+    {
+        std::cerr << "\033[31mError: No se pudo leer el archivo del sistema simulado.\033[0m" << std::endl;
+        return false;
+    }
+
+    std::ofstream archivoReal(file2, std::ios::binary);
+    if (!archivoReal.is_open())
+    {
+        std::cerr << "\033[31mError: No se pudo crear el archivo real.\033[0m" << std::endl;
+        return false;
+    }
+
+    archivoReal.write(contenido.data(), contenido.size());
+    archivoReal.close();
+
+    std::cout << "\033[32mArchivo copiado exitosamente al sistema real.\033[0m" << std::endl;
+    return true;
 }
 
 bool SistemaArchivos::copyIn(const std::string &file1, const std::string &file2)
 {
-    return false;
+
+    std::cout << "\033[1;33m[DEBUG] Intentando abrir el archivo host: " << file1 << "\033[0m\n";
+
+    std::fstream archivoReal(file1);
+    if (!archivoReal.is_open())
+    {
+        std::cerr << "\033[31mError: No se pudo abrir el archivo real.\033[0m" << std::endl;
+        return false;
+    }
+
+    // Obtiene el tamaño del archivo real
+    archivoReal.seekg(0, std::ios::end);
+    std::size_t fileSize = archivoReal.tellg();
+    archivoReal.seekg(0, std::ios::beg);
+
+    // Verifica si el archivo excede 8 veces el tamaño de un bloque
+    if (fileSize > 8 * Bsize)
+    {
+        std::cerr << "\033[31mError: El archivo real excede el tamaño permitido (8 bloques).\033[0m" << std::endl;
+        return false;
+    }
+
+    // Lee el contenido del archivo real
+    std::vector<char> buffer(fileSize);
+    archivoReal.read(buffer.data(), fileSize);
+    archivoReal.close();
+
+    // Convierte el contenido a un string y escribe en el sistema simulado
+    std::string data(buffer.begin(), buffer.end());
+    if (!writeFile(file2, data))
+    {
+        std::cerr << "\033[31mError: No se pudo copiar el archivo al sistema simulado.\033[0m" << std::endl;
+        return false;
+    }
+
+    std::cout << "\033[32mArchivo copiado exitosamente al sistema simulado.\033[0m" << std::endl;
+    return true;
 }
 
 bool SistemaArchivos::deleteFile(const std::string &name)
@@ -194,38 +241,53 @@ bool SistemaArchivos::deleteFile(const std::string &name)
         }
     }
 
-    std::cerr << "Error: El archivo no se encontró." << std::endl;
+    std::cerr << "\033[31m" << "Error: El archivo no se encontró.\033[0m" << std::endl;
     return false;
 }
 void SistemaArchivos::listFiles()
 {
-    bool archivosEncontrados = false; // Indicador de si hay archivos en el sistema.
-
-    std::cout << "Archivos en el sistema de archivos:" << std::endl;
+    bool archivosEncontrados = false;
     for (const auto &inodo : fileTable)
     {
         if (!inodo.isFree)
-        { // Si el inodo está ocupado, significa que representa un archivo.
+        {
+            std::cout << "----------------------------------------------------------------------------------------" << std::endl;
             archivosEncontrados = true;
-            std::cout << "- Nombre: " << inodo.name
-                      << ", Tamaño: " << inodo.size << " bytes ";
+            std::cout << "\033[36m" << "- Nombre: " << inodo.name
+                      << "\033[36m" << ", Tamaño: " << inodo.size << " bytes \033[0m" << std::endl;
             for (int i = 0; i < inodo.Apuntadores.size(); i++)
             {
+
                 if (inodo.Apuntadores[i] != 0)
                 {
+
                     std::cout << i << ". offset: " << inodo.Apuntadores[i] << " - " << std::endl;
                     std::cout << i << ". bloque: " << floor(inodo.Apuntadores[i] / Bsize) << " - " << std::endl;
                 }
             }
-
-            std::cout << std::endl;
+            std::cout << "----------------------------------------------------------------------------------------" << std::endl;
         }
     }
 
     if (!archivosEncontrados)
     {
-        std::cout << "No hay archivos en el sistema." << std::endl;
+        std::cout << "No hay archivos en el sistema.\033[0m" << std::endl;
     }
+}
+
+std::string SistemaArchivos::hexDump(const std::string &name)
+{
+    std::string contenido = cat(name);
+
+    std::ostringstream hexStream;
+
+    for (unsigned char c : contenido)
+    {
+        hexStream << std::hex << std::setw(2) << std::setfill('0')
+                  << static_cast<int>(c) << " ";
+    }
+
+    return hexStream.str();
 }
 
 std::size_t SistemaArchivos::getNextFreeBlock()
@@ -240,8 +302,8 @@ std::size_t SistemaArchivos::getNextFreeBlock()
         }
     }
 
-    std::cout << "Error: No hay bloques libres disponibles." << std::endl;
-    return -1; // Indica que no hay bloques libres disponibles
+    std::cout << "\033[31m" << "Error: No hay bloques libres disponibles.\033[0m" << std::endl;
+    return -1;
 }
 
 void SistemaArchivos::verificarDatos()
@@ -249,7 +311,7 @@ void SistemaArchivos::verificarDatos()
     std::fstream archivo(nfile);
     if (!archivo.is_open())
     {
-        std::cout << "Sistema de bloques no encontrado" << std::endl;
+        std::cout << "\033[36m" << "Sistema de bloques no encontrado\033[0m" << std::endl;
         return;
     }
 
@@ -305,19 +367,14 @@ bool SistemaArchivos::AsignarApuntadores(std::string name, std::vector<size_t> &
 
     for (int i = 0; i < 256; i++)
     {
-        std::cout << 20 << std::endl;
         if (fileTable[i].name == name)
         {
-            std::cout << "p: " << fileTable[i].Apuntadores.size() << std::endl;
-            std::cout << 21 << std::endl;
 
             for (int j = 0; j < 8; ++j)
             {
-                std::cout << 22 << std::endl;
 
                 if (fileTable[i].Apuntadores[j] == 0 && pos < apunts.size())
                 {
-                    std::cout << 23 << std::endl;
                     fileTable[i].Apuntadores[j] = apunts[pos];
                     pos++;
 
@@ -325,8 +382,6 @@ bool SistemaArchivos::AsignarApuntadores(std::string name, std::vector<size_t> &
                     {
                         break;
                     }
-
-                    std::cout << 24 << std::endl;
                 }
             }
 
@@ -375,7 +430,7 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
 
         if (ultimoBloqueUsado != static_cast<size_t>(-1) && espacioDisponibleEnUltimoBloque > 0)
         {
-            // Si el último bloque tiene espacio, escribe allí
+
             bytesToWrite = std::min(data.size() - dataPos, espacioDisponibleEnUltimoBloque);
 
             archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque));
@@ -386,7 +441,7 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
         }
         else
         {
-            // Si no hay bloques disponibles o el último está lleno, asigna uno nuevo
+
             size_t bloqueLibre = getNextFreeBlock();
             if (bloqueLibre == static_cast<size_t>(-1))
             {
@@ -400,7 +455,6 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
             archivo.seekp(bloqueLibre * Bsize);
             archivo.write(data.data() + dataPos, bytesToWrite);
 
-            // Llena el resto del bloque con ceros si es necesario
             if (bytesToWrite < Bsize)
             {
                 std::vector<char> padding(Bsize - bytesToWrite, '\0');
@@ -456,7 +510,7 @@ size_t SistemaArchivos::blockisCompleto(size_t offset)
     std::fstream archivo(nfile);
     if (!archivo.is_open())
     {
-        std::cerr << "No se pudo abrir el archivo." << std::endl;
+        std::cout << "\033[36m" << "No se pudo abrir el archivo.\033[0m" << std::endl;
         exit(0);
     }
 

@@ -2,7 +2,6 @@
 class SistemaArchivos
 {
 public:
-    BlockDevice device;
     std::vector<bool> MapaDeBloquesLibres;
     struct Inodo
     {
@@ -51,24 +50,27 @@ public:
     size_t blockisCompleto(size_t offset);
     void liberarBloque(std::fstream &archivo,size_t);
 
-    SistemaArchivos()
+    SistemaArchivos(BlockDevice& dis)
     {
 
-        nfile = "blockdevice.bin";
+        nfile = dis.getFilename();
         std::fstream archivo(nfile);
         if (archivo.is_open())
         {
             archivo.seekg(0);
             archivo.read(reinterpret_cast<char *>(&Bsize), sizeof(size_t));
-            std::cout << Bsize << std::endl;
+            
             archivo.read(reinterpret_cast<char *>(&Bcount), sizeof(size_t));
-            std::cout << Bcount << std::endl;
+            
 
             fileTable.resize(maxFiles);
             MapaDeBloquesLibres.resize(Bcount);
 
             superbloqueLong = ceil(sizeof(Bsize) + sizeof(Bcount) + Bsize + 35072) / Bsize;
+
             std::cout << "Superbloque: " << superbloqueLong << std::endl;
+            std::cout << "BlockSize: " << Bsize << std::endl;
+            std::cout << "BlockCount: " << Bcount << std::endl;
 
             leerFileTable(archivo);
             leerMapa(archivo);
