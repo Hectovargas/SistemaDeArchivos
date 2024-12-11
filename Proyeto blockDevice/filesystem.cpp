@@ -102,8 +102,24 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
     {
         if (!i.isFree && std::string(i.name) == name)
         {
-            i.size += data.size();
-            AsignarBloques(archivo, data.size(), name, data, false);
+
+            if (AsignarBloques(archivo, data.size(), name, data, false))
+            {
+                i.size += data.size();
+                if (i.size > (8 * Bsize))
+                {
+                    i.size = 8 * Bsize;
+                    GuardarMapa(archivo);
+                    GuardarFiletable(archivo);
+                    return true;
+                }
+            }
+            else
+            {
+                GuardarMapa(archivo);
+                GuardarFiletable(archivo);
+                return false;
+            }
             GuardarMapa(archivo);
             GuardarFiletable(archivo);
 
@@ -120,6 +136,10 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
             i.isFree = false;
             i.size = data.size();
             AsignarBloques(archivo, data.size(), name, data, true);
+            if (i.size > (8 * Bsize))
+            {
+                i.size = 8 * Bsize;
+            }
             GuardarMapa(archivo);
             GuardarFiletable(archivo);
             return true;
@@ -213,7 +233,7 @@ bool SistemaArchivos::copyIn(const std::string &file1, const std::string &file2)
     std::size_t fileSize = archivoReal.tellg();
     archivoReal.seekg(0, std::ios::beg);
 
-    if (fileSize > Bsize*8)
+    if (fileSize > Bsize * 8)
     {
         std::cerr << "\033[31mError: El archivo real excede el tamaño permitido (8 bloques).\033[0m" << std::endl;
         return false;
@@ -438,7 +458,7 @@ bool SistemaArchivos::AsignarApuntadores(std::string name, std::vector<size_t> &
 
     return false;
 }
-void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo)
+bool SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo)
 {
     std::vector<size_t> bloquesAsignados;
     size_t dataPos = 0;
@@ -446,30 +466,42 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
     size_t ultimoBloqueUsado = static_cast<size_t>(-1);
     size_t espacioDisponibleEnUltimoBloque = 0;
 
+    size_t bloquesAsignadosActuales = 0;
     for (Inodo &i : fileTable)
     {
-        if (std::string(i.name) == name && !nuevo && !i.Apuntadores.empty())
+        if (std::string(i.name) == name)
         {
-            for (int j = 7; j >= 0; --j)
+            for (int j = 0; j < 8; ++j)
             {
                 if (i.Apuntadores[j] != 0)
                 {
-                    ultimoBloqueUsado = i.Apuntadores[j] / Bsize;
-                    espacioDisponibleEnUltimoBloque = Bsize - blockisCompleto(i.Apuntadores[j]);
-                    break;
+                    bloquesAsignadosActuales++;
                 }
             }
             break;
         }
     }
 
-    while (dataPos < data.size())
+    if (bloquesAsignadosActuales >= 8)
+    {
+        std::cout << "\033[31m" << "Error: El archivo ya ha alcanzado el límite de 8 bloques.\033[0m" << std::endl;
+        return false;
+    }
+
+    size_t espacioDisponible = (8 - bloquesAsignadosActuales) * Bsize;
+    if (final > espacioDisponible)
+    {
+        std::cout << "Advertencia: Los datos exceden el tamaño permitido, se escribirán solo " << espacioDisponible << " bytes." << std::endl;
+        final = espacioDisponible;
+    }
+
+    while (dataPos < final)
     {
         size_t bytesToWrite;
 
         if (ultimoBloqueUsado != static_cast<size_t>(-1) && espacioDisponibleEnUltimoBloque > 0)
         {
-            bytesToWrite = std::min(data.size() - dataPos, espacioDisponibleEnUltimoBloque);
+            bytesToWrite = std::min(final - dataPos, espacioDisponibleEnUltimoBloque);
 
             archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque), std::ios::beg);
             archivo.write(data.data() + dataPos, bytesToWrite);
@@ -483,12 +515,12 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
             if (bloqueLibre == static_cast<size_t>(-1))
             {
                 std::cerr << "Error: No hay bloques libres disponibles." << std::endl;
-                return;
+                return false;
             }
 
             bloquesAsignados.push_back(bloqueLibre * Bsize);
 
-            bytesToWrite = std::min(data.size() - dataPos, static_cast<size_t>(Bsize));
+            bytesToWrite = std::min(final - dataPos, static_cast<size_t>(Bsize));
 
             archivo.seekp(bloqueLibre * Bsize, std::ios::beg);
             archivo.write(data.data() + dataPos, bytesToWrite);
@@ -505,7 +537,11 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
         }
     }
 
-    AsignarApuntadores(name, bloquesAsignados);
+    if (AsignarApuntadores(name, bloquesAsignados))
+    {
+        return true;
+    }
+    return false;
 }
 
 size_t SistemaArchivos::calcularInicio(std::string &name, size_t punteroActual)

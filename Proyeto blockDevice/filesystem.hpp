@@ -43,7 +43,7 @@ public:
     void leerMapa(std::fstream &archivo);
     void GuardarMapa(std::fstream &archivo);
     bool AsignarApuntadores(std::string name, std::vector<size_t> &apunts);
-    void AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo);
+    bool AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo);
     size_t calcularInicio(std::string &name, size_t punteroActual);
     size_t calcularfinal(std::string &name);
     void escribirBloques(std::fstream &archivo, size_t inicio, size_t final, const std::string &data);
