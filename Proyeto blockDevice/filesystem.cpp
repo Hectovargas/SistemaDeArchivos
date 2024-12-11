@@ -1,19 +1,54 @@
 #include "filesystem.hpp"
 
-bool SistemaArchivos::format()
+/*
+void SistemaArchivos::imprimirContenidoDisco()
 {
     std::fstream archivo(nfile);
+    if (!archivo.is_open())
+    {
+        std::cerr << "Error al abrir el archivo del sistema de bloques." << std::endl;
+        return;
+    }
+
+    std::cout << "Superbloque: " << superbloqueLong << std::endl;
+    std::cout << "BlockSize: " << Bsize << std::endl;
+    std::cout << "BlockCount: " << Bcount << std::endl;
+
+
+    archivo.seekg(superbloqueLong * Bsize, std::ios::beg);
+
+    size_t bloqueIndex = superbloqueLong;
+    std::vector<char> buffer(Bsize, '\0');
+
+    while (archivo.read(buffer.data(), Bsize))
+    {
+        std::cout << "Bloque " << bloqueIndex << ": ";
+        for (size_t i = 0; i < Bsize; ++i)
+        {
+            std::cout << buffer[i];
+        }
+        std::cout << std::endl;
+
+        ++bloqueIndex;
+    }
+
+    archivo.close();
+}
+*/
+bool SistemaArchivos::format()
+{
+    std::fstream archivo(nfile, std::ios::in | std::ios::out | std::ios::binary);
     if (!archivo.is_open())
     {
         std::cout << "\033[31m" << "Sistema de bloques no encontrado\033[0m" << std::endl;
         return false;
     }
 
-    MapaDeBloquesLibres.assign(Bcount, true);
+    MapaDeBloquesLibres.assign(Bcount, false);
 
     for (int i = 0; i <= superbloqueLong; i++)
     {
-        MapaDeBloquesLibres[i] = false;
+        MapaDeBloquesLibres[i] = true;
     }
 
     fileTable.clear();
@@ -27,18 +62,18 @@ bool SistemaArchivos::format()
         fileTable.push_back(inodo);
     }
 
+    archivo.seekp(0, std::ios::beg);
     archivo.write(reinterpret_cast<char *>(&Bsize), sizeof(Bsize));
     archivo.write(reinterpret_cast<char *>(&Bcount), sizeof(Bcount));
 
-    GuardarMapa(archivo);
-    GuardarFiletable(archivo);
-
-    // Rellena el resto del disco con bloques vacíos
     std::vector<char> emptyBlock(Bsize, '\0');
     for (std::size_t i = 0; i < Bcount; ++i)
     {
         archivo.write(emptyBlock.data(), emptyBlock.size());
     }
+
+    GuardarMapa(archivo);
+    GuardarFiletable(archivo);
 
     archivo.close();
 
@@ -69,8 +104,9 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
         {
             i.size += data.size();
             AsignarBloques(archivo, data.size(), name, data, false);
-            GuardarFiletable(archivo);
             GuardarMapa(archivo);
+            GuardarFiletable(archivo);
+
             return true;
         }
     }
@@ -84,8 +120,8 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
             i.isFree = false;
             i.size = data.size();
             AsignarBloques(archivo, data.size(), name, data, true);
-            GuardarFiletable(archivo);
             GuardarMapa(archivo);
+            GuardarFiletable(archivo);
             return true;
         }
     }
@@ -96,7 +132,7 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
 
 std::string SistemaArchivos::cat(const std::string &name)
 {
-    std::fstream archivo(nfile, std::ios::in | std::ios::binary);
+    std::fstream archivo(nfile, std::ios::in | std::ios::out | std::ios::binary);
     if (!archivo.is_open())
     {
         std::cerr << "No se pudo abrir el archivo." << std::endl;
@@ -106,12 +142,10 @@ std::string SistemaArchivos::cat(const std::string &name)
     leerFileTable(archivo);
     std::string texto;
 
-    for (const Inodo &nodo : fileTable)
+    for (Inodo &nodo : fileTable)
     {
-
         if (std::string(nodo.name) == name)
         {
-
             for (size_t ptr : nodo.Apuntadores)
             {
                 if (ptr != 0)
@@ -128,8 +162,8 @@ std::string SistemaArchivos::cat(const std::string &name)
 
                     for (char c : buffer)
                     {
-                        if (c == '\0')
-                            return texto;
+                        if (c == '\0' && !texto.empty())
+                            break; // Termina la lectura si ya encontramos un bloque vacío al final.
                         texto += c;
                     }
                 }
@@ -175,24 +209,20 @@ bool SistemaArchivos::copyIn(const std::string &file1, const std::string &file2)
         return false;
     }
 
-    // Obtiene el tamaño del archivo real
     archivoReal.seekg(0, std::ios::end);
     std::size_t fileSize = archivoReal.tellg();
     archivoReal.seekg(0, std::ios::beg);
 
-    // Verifica si el archivo excede 8 veces el tamaño de un bloque
-    if (fileSize > 8 * Bsize)
+    if (fileSize > Bsize*8)
     {
         std::cerr << "\033[31mError: El archivo real excede el tamaño permitido (8 bloques).\033[0m" << std::endl;
         return false;
     }
 
-    // Lee el contenido del archivo real
     std::vector<char> buffer(fileSize);
     archivoReal.read(buffer.data(), fileSize);
     archivoReal.close();
 
-    // Convierte el contenido a un string y escribe en el sistema simulado
     std::string data(buffer.begin(), buffer.end());
     if (!writeFile(file2, data))
     {
@@ -206,7 +236,7 @@ bool SistemaArchivos::copyIn(const std::string &file1, const std::string &file2)
 
 bool SistemaArchivos::deleteFile(const std::string &name)
 {
-    std::fstream archivo(nfile, std::ios::in | std::ios::out);
+    std::fstream archivo(nfile, std::ios::in | std::ios::out | std::ios::binary);
     leerFileTable(archivo);
     leerMapa(archivo);
 
@@ -257,10 +287,8 @@ void SistemaArchivos::listFiles()
                       << "\033[36m" << ", Tamaño: " << inodo.size << " bytes \033[0m" << std::endl;
             for (int i = 0; i < inodo.Apuntadores.size(); i++)
             {
-
                 if (inodo.Apuntadores[i] != 0)
                 {
-
                     std::cout << i << ". offset: " << inodo.Apuntadores[i] << " - " << std::endl;
                     std::cout << i << ". bloque: " << floor(inodo.Apuntadores[i] / Bsize) << " - " << std::endl;
                 }
@@ -278,7 +306,6 @@ void SistemaArchivos::listFiles()
 std::string SistemaArchivos::hexDump(const std::string &name)
 {
     std::string contenido = cat(name);
-
     std::ostringstream hexStream;
 
     for (unsigned char c : contenido)
@@ -295,9 +322,9 @@ std::size_t SistemaArchivos::getNextFreeBlock()
 
     for (std::size_t i = 0; i < MapaDeBloquesLibres.size(); ++i)
     {
-        if (MapaDeBloquesLibres[i])
+        if (!MapaDeBloquesLibres[i])
         {
-            MapaDeBloquesLibres[i] = false;
+            MapaDeBloquesLibres[i] = true;
             return i;
         }
     }
@@ -323,25 +350,39 @@ void SistemaArchivos::verificarDatos()
 
 void SistemaArchivos::leerFileTable(std::fstream &archivo)
 {
-    archivo.seekg(sizeof(Bcount) + sizeof(Bsize) + Bcount);
-    for (int i = 0; i < 256; i++)
+    archivo.seekg(sizeof(Bcount) + sizeof(Bsize) + Bcount, std::ios::beg);
+    for (int i = 0; i < maxFiles; i++)
     {
-        archivo.read(reinterpret_cast<char *>(&fileTable[i]), sizeof(Inodo));
+        archivo.read(reinterpret_cast<char *>(fileTable[i].name), sizeof(fileTable[i].name));
+        archivo.read(reinterpret_cast<char *>(&fileTable[i].size), sizeof(fileTable[i].size));
+        fileTable[i].Apuntadores.resize(8);
+        for (int j = 0; j < 8; j++)
+        {
+            archivo.read(reinterpret_cast<char *>(&fileTable[i].Apuntadores[j]), sizeof(std::size_t));
+        }
+
+        archivo.read(reinterpret_cast<char *>(&fileTable[i].isFree), sizeof(fileTable[i].isFree));
     }
 }
 
 void SistemaArchivos::GuardarFiletable(std::fstream &archivo)
 {
-    archivo.seekp(sizeof(Bcount) + sizeof(Bsize) + Bcount);
-    for (int i = 0; i < 256; i++)
+    archivo.seekp(sizeof(Bcount) + sizeof(Bsize) + Bcount, std::ios::beg);
+    for (int i = 0; i < maxFiles; i++)
     {
-        archivo.write(reinterpret_cast<char *>(&fileTable[i]), sizeof(Inodo));
+        archivo.write(reinterpret_cast<const char *>(fileTable[i].name), sizeof(fileTable[i].name));
+        archivo.write(reinterpret_cast<const char *>(&fileTable[i].size), sizeof(fileTable[i].size));
+        for (int j = 0; j < 8; j++)
+        {
+            archivo.write(reinterpret_cast<const char *>(&fileTable[i].Apuntadores[j]), sizeof(std::size_t));
+        }
+        archivo.write(reinterpret_cast<const char *>(&fileTable[i].isFree), sizeof(fileTable[i].isFree));
     }
 }
 
 void SistemaArchivos::leerMapa(std::fstream &archivo)
 {
-    archivo.seekg(sizeof(Bcount) + sizeof(Bsize));
+    archivo.seekg(sizeof(Bcount) + sizeof(Bsize), std::ios::beg);
     for (size_t i = 0; i < Bcount; i++)
     {
         bool temp;
@@ -352,7 +393,7 @@ void SistemaArchivos::leerMapa(std::fstream &archivo)
 
 void SistemaArchivos::GuardarMapa(std::fstream &archivo)
 {
-    archivo.seekp(sizeof(Bcount) + sizeof(Bsize));
+    archivo.seekp(sizeof(Bcount) + sizeof(Bsize), std::ios::beg);
     for (size_t i = 0; i < Bcount; i++)
     {
         bool temp;
@@ -397,7 +438,6 @@ bool SistemaArchivos::AsignarApuntadores(std::string name, std::vector<size_t> &
 
     return false;
 }
-
 void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo)
 {
     std::vector<size_t> bloquesAsignados;
@@ -410,7 +450,6 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
     {
         if (std::string(i.name) == name && !nuevo && !i.Apuntadores.empty())
         {
-
             for (int j = 7; j >= 0; --j)
             {
                 if (i.Apuntadores[j] != 0)
@@ -430,10 +469,9 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
 
         if (ultimoBloqueUsado != static_cast<size_t>(-1) && espacioDisponibleEnUltimoBloque > 0)
         {
-
             bytesToWrite = std::min(data.size() - dataPos, espacioDisponibleEnUltimoBloque);
 
-            archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque));
+            archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque), std::ios::beg);
             archivo.write(data.data() + dataPos, bytesToWrite);
 
             espacioDisponibleEnUltimoBloque -= bytesToWrite;
@@ -441,7 +479,6 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
         }
         else
         {
-
             size_t bloqueLibre = getNextFreeBlock();
             if (bloqueLibre == static_cast<size_t>(-1))
             {
@@ -452,7 +489,8 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
             bloquesAsignados.push_back(bloqueLibre * Bsize);
 
             bytesToWrite = std::min(data.size() - dataPos, static_cast<size_t>(Bsize));
-            archivo.seekp(bloqueLibre * Bsize);
+
+            archivo.seekp(bloqueLibre * Bsize, std::ios::beg);
             archivo.write(data.data() + dataPos, bytesToWrite);
 
             if (bytesToWrite < Bsize)
@@ -466,6 +504,7 @@ void SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
             espacioDisponibleEnUltimoBloque = Bsize - bytesToWrite;
         }
     }
+
     AsignarApuntadores(name, bloquesAsignados);
 }
 
@@ -537,5 +576,5 @@ void SistemaArchivos::liberarBloque(std::fstream &archivo, size_t bloque)
     std::vector<char> padding(Bsize, '\0');
     archivo.write(padding.data(), padding.size());
 
-    MapaDeBloquesLibres[bloque] = true;
+    MapaDeBloquesLibres[bloque] = false;
 }

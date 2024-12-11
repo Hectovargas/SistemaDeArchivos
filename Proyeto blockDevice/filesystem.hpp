@@ -48,32 +48,51 @@ public:
     size_t calcularfinal(std::string &name);
     void escribirBloques(std::fstream &archivo, size_t inicio, size_t final, const std::string &data);
     size_t blockisCompleto(size_t offset);
-    void liberarBloque(std::fstream &archivo,size_t);
+    void liberarBloque(std::fstream &archivo, size_t);
+    //void imprimirContenidoDisco();
 
-    SistemaArchivos(BlockDevice& dis)
+    SistemaArchivos(BlockDevice &dis)
     {
-
+        bool nuevo = true;
         nfile = dis.getFilename();
         std::fstream archivo(nfile);
         if (archivo.is_open())
         {
             archivo.seekg(0);
             archivo.read(reinterpret_cast<char *>(&Bsize), sizeof(size_t));
-            
+
             archivo.read(reinterpret_cast<char *>(&Bcount), sizeof(size_t));
-            
+            superbloqueLong = ceil(16 + Bcount + (256*137)) / Bsize;
 
             fileTable.resize(maxFiles);
             MapaDeBloquesLibres.resize(Bcount);
+            leerFileTable(archivo);
+            leerMapa(archivo);
 
-            superbloqueLong = ceil(sizeof(Bsize) + sizeof(Bcount) + Bsize + 35072) / Bsize;
+            for (int i = 0; i < Bcount; i++)
+            {
+                if (MapaDeBloquesLibres[i])
+                {
+                    
+                    nuevo = false;
+                    break;
+                }
+            }
+
+            if (nuevo)
+            {
+                std::cout << "El archivo esta como nuevo" << std::endl;
+                format();
+            }
+            else
+            {
+
+                std::cout << "El archivo ya tiene cosas" << std::endl;
+            }
 
             std::cout << "Superbloque: " << superbloqueLong << std::endl;
             std::cout << "BlockSize: " << Bsize << std::endl;
             std::cout << "BlockCount: " << Bcount << std::endl;
-
-            leerFileTable(archivo);
-            leerMapa(archivo);
         }
         else
         {

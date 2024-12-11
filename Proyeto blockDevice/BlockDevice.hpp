@@ -13,13 +13,15 @@
 class BlockDevice
 {
 private:
-    std::fstream file;
+
     std::string filename;
     std::size_t blockSize;
     std::size_t blockCount;
     bool isOpen;
 
 public:
+    std::fstream file;
+
     BlockDevice() : blockSize(0), blockCount(0), isOpen(false) {}
 
     std::string getFilename()
@@ -55,6 +57,7 @@ public:
         file.seekg(0, std::ios::beg);
         file.read(reinterpret_cast<char *>(&blockSize), sizeof(blockSize));
         file.read(reinterpret_cast<char *>(&blockCount), sizeof(blockCount));
+        
 
         isOpen = true;
         return true;
@@ -78,7 +81,8 @@ public:
 
         this->blockSize = blockSize;
         this->blockCount = blockCount;
-
+        
+        archivo.seekp(0, std::ios::beg);
         archivo.write(reinterpret_cast<const char *>(&blockSize), sizeof(blockSize));
         archivo.write(reinterpret_cast<const char *>(&blockCount), sizeof(blockCount));
 
