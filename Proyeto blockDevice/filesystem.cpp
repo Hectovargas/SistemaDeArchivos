@@ -80,8 +80,9 @@ bool SistemaArchivos::format()
     return true;
 }
 
-bool SistemaArchivos::writeFile(const std::string &name, const std::string &data)
+bool SistemaArchivos::writeFile(const std::string &name, std::string &data)
 {
+
     if (name.size() > 64)
     {
         std::cout << "\033[31m" << "Nombre de archivo demasiado largo\033[0m" << std::endl;
@@ -102,29 +103,30 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
     {
         if (!i.isFree && std::string(i.name) == name)
         {
-
             if (AsignarBloques(archivo, data.size(), name, data, false))
             {
                 i.size += data.size();
                 if (i.size > (8 * Bsize))
                 {
                     i.size = 8 * Bsize;
-                    GuardarMapa(archivo);
                     GuardarFiletable(archivo);
                     return true;
                 }
+                GuardarMapa(archivo);
+                GuardarFiletable(archivo);
+                return true;
             }
             else
             {
-                GuardarMapa(archivo);
-                GuardarFiletable(archivo);
                 return false;
             }
-            GuardarMapa(archivo);
-            GuardarFiletable(archivo);
-
-            return true;
         }
+    }
+
+    if (obteneBloquesLibres()-1 == 0)
+    {
+        std::cout << "\033[31m" << "El disco esta lleno, por favor borrar archivos o formatear" << std::endl;
+        return false;
     }
 
     for (Inodo &i : fileTable)
@@ -135,13 +137,17 @@ bool SistemaArchivos::writeFile(const std::string &name, const std::string &data
             i.name[sizeof(i.name) - 1] = '\0';
             i.isFree = false;
             i.size = data.size();
+            if(data.size() > (obteneBloquesLibres()-1)*Bsize)
+            {
+                i.size = (obteneBloquesLibres()-1)*Bsize;
+            }
             AsignarBloques(archivo, data.size(), name, data, true);
             if (i.size > (8 * Bsize))
             {
                 i.size = 8 * Bsize;
             }
-            GuardarMapa(archivo);
             GuardarFiletable(archivo);
+            GuardarMapa(archivo);
             return true;
         }
     }
@@ -264,7 +270,6 @@ bool SistemaArchivos::deleteFile(const std::string &name)
     {
         if (i.name == name)
         {
-            // Liberar los bloques de datos
             for (int j = 0; j < i.Apuntadores.size(); j++)
             {
                 if (i.Apuntadores[j] != 0)
@@ -456,9 +461,10 @@ bool SistemaArchivos::AsignarApuntadores(std::string name, std::vector<size_t> &
         }
     }
 
+    std::cout << "Algo paso" << std::endl;
     return false;
 }
-bool SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, const std::string &data, bool nuevo)
+bool SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const std::string &name, std::string &data, bool nuevo)
 {
     std::vector<size_t> bloquesAsignados;
     size_t dataPos = 0;
@@ -466,44 +472,54 @@ bool SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
     size_t ultimoBloqueUsado = static_cast<size_t>(-1);
     size_t espacioDisponibleEnUltimoBloque = 0;
 
-    size_t bloquesAsignadosActuales = 0;
     for (Inodo &i : fileTable)
     {
-        if (std::string(i.name) == name)
+
+        if (std::string(i.name) == name && !nuevo && !i.Apuntadores.empty())
         {
-            for (int j = 0; j < 8; ++j)
+            if (i.size >= 8 * Bsize)
+            {
+                std::cout << "\033[1;31m✘ Error, El archivo esta lleno.\033[0m\n";
+                return false;
+            }
+            for (int j = 7; j >= 0; --j)
             {
                 if (i.Apuntadores[j] != 0)
                 {
-                    bloquesAsignadosActuales++;
+                    ultimoBloqueUsado = i.Apuntadores[j] / Bsize;
+                    espacioDisponibleEnUltimoBloque = Bsize - blockisCompleto(i.Apuntadores[j]);
+                    if (espacioDisponibleEnUltimoBloque + (Bsize * (7 - j)) < data.size())
+                    {
+                        data.resize(espacioDisponibleEnUltimoBloque + (Bsize * (7 - j)));
+                        std::cout << "el texto se recorto ya que excedio el limite de espacio en el archivo" << std::endl;
+
+                    }
+                    if((obteneBloquesLibres()*Bsize)>(espacioDisponibleEnUltimoBloque + (Bsize * (7 - j)))){
+                        data.resize(obteneBloquesLibres()*Bsize);
+                    }
+                    break;
                 }
             }
             break;
         }
     }
-
-    if (bloquesAsignadosActuales >= 8)
-    {
-        std::cout << "\033[31m" << "Error: El archivo ya ha alcanzado el límite de 8 bloques.\033[0m" << std::endl;
-        return false;
+    
+    if((obteneBloquesLibres()-1)*Bsize < data.size()){
+        std::cout << "No hay suficiente espacio en el disco, el texto se acortara" << std::endl;
+        data.resize((obteneBloquesLibres()-1)*Bsize);
     }
 
-    size_t espacioDisponible = (8 - bloquesAsignadosActuales) * Bsize;
-    if (final > espacioDisponible)
+    while (dataPos < data.size())
     {
-        std::cout << "Advertencia: Los datos exceden el tamaño permitido, se escribirán solo " << espacioDisponible << " bytes." << std::endl;
-        final = espacioDisponible;
-    }
-
-    while (dataPos < final)
-    {
+        
         size_t bytesToWrite;
 
         if (ultimoBloqueUsado != static_cast<size_t>(-1) && espacioDisponibleEnUltimoBloque > 0)
         {
-            bytesToWrite = std::min(final - dataPos, espacioDisponibleEnUltimoBloque);
 
-            archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque), std::ios::beg);
+            bytesToWrite = std::min(data.size() - dataPos, espacioDisponibleEnUltimoBloque);
+
+            archivo.seekp(ultimoBloqueUsado * Bsize + (Bsize - espacioDisponibleEnUltimoBloque));
             archivo.write(data.data() + dataPos, bytesToWrite);
 
             espacioDisponibleEnUltimoBloque -= bytesToWrite;
@@ -511,18 +527,18 @@ bool SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
         }
         else
         {
+
             size_t bloqueLibre = getNextFreeBlock();
             if (bloqueLibre == static_cast<size_t>(-1))
             {
-                std::cerr << "Error: No hay bloques libres disponibles." << std::endl;
+                std::cerr << "\033[1;31m✘ Error: No hay bloques libres disponibles, el sistema de archivos esta lleno.\033[0m" << std::endl;
                 return false;
             }
 
             bloquesAsignados.push_back(bloqueLibre * Bsize);
 
-            bytesToWrite = std::min(final - dataPos, static_cast<size_t>(Bsize));
-
-            archivo.seekp(bloqueLibre * Bsize, std::ios::beg);
+            bytesToWrite = std::min(data.size() - dataPos, static_cast<size_t>(Bsize));
+            archivo.seekp(bloqueLibre * Bsize);
             archivo.write(data.data() + dataPos, bytesToWrite);
 
             if (bytesToWrite < Bsize)
@@ -541,6 +557,7 @@ bool SistemaArchivos::AsignarBloques(std::fstream &archivo, size_t final, const 
     {
         return true;
     }
+
     return false;
 }
 
@@ -613,4 +630,22 @@ void SistemaArchivos::liberarBloque(std::fstream &archivo, size_t bloque)
     archivo.write(padding.data(), padding.size());
 
     MapaDeBloquesLibres[bloque] = false;
+}
+
+size_t SistemaArchivos::obteneBloquesLibres()
+{
+    size_t j = 0;
+    for (size_t i = Bcount; i > 0; i--)
+    {
+        if (!MapaDeBloquesLibres[i])
+        {
+            j++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return j;
 }

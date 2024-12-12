@@ -1,7 +1,5 @@
 #include "filesystem.hpp"
 
-// blockdevice.bin
-
 void mostrarAyuda()
 {
     std::cout << "\n-----------------------------------------------------------------\n";
@@ -9,12 +7,23 @@ void mostrarAyuda()
     std::cout << "  create <nombre_archivo> <tamaño_bloque> <cantidad_bloques>\n";
     std::cout << "  open <nombre_archivo>\n";
     std::cout << "  close\n";
-    std::cout << "  write <numero_bloque> \"<datos_a_escribir>\"\n";
-    std::cout << "  read <numero_bloque> [offset] [length]\n";
     std::cout << "  info\n";
     std::cout << "  exit\n";
     std::cout << "  archivos (para gestionar archivos en el sistema)\n";
     std::cout << "-----------------------------------------------------------------\n";
+}
+
+std::string extraerTextoEntreDelimitadores(const std::string &texto, char inicio = '<', char fin = '>')
+{
+    size_t posInicio = texto.find(inicio);
+    size_t posFin = texto.find(fin, posInicio + 1);
+
+    if (posInicio != std::string::npos && posFin != std::string::npos)
+    {
+        return texto.substr(posInicio + 1, posFin - posInicio - 1);
+    }
+
+    return "";
 }
 
 void interfazComandos(SistemaArchivos &sistema)
@@ -30,8 +39,19 @@ void interfazComandos(SistemaArchivos &sistema)
         std::cout << std::setw(3) << ">> ";
         std::getline(std::cin, comando);
         std::istringstream stream(comando);
-        std::string operacion, arg1, arg2, texto;
+        std::string operacion, argumento;
+
         stream >> operacion;
+
+        // Función para extraer texto entre <>
+        auto extraerTextoEntreAngulos = [](const std::string &input) -> std::string
+        {
+            size_t inicio = input.find('<');
+            size_t fin = input.find('>');
+            if (inicio == std::string::npos || fin == std::string::npos || inicio >= fin)
+                return "";
+            return input.substr(inicio + 1, fin - inicio - 1);
+        };
 
         if (operacion == "format")
         {
@@ -52,115 +72,124 @@ void interfazComandos(SistemaArchivos &sistema)
         }
         else if (operacion == "cat")
         {
-            stream >> arg1;
-            if (arg1.empty())
+            std::getline(stream, argumento);
+            std::string archivo = extraerTextoEntreAngulos(argumento);
+            if (archivo.empty())
             {
-                std::cerr << "\033[1;31m✘ Error: Debes especificar un archivo.\033[0m\n";
+                std::cerr << "\033[1;31m✘ Error: Formato inválido. Usa: cat <archivo>\033[0m\n";
             }
             else
             {
-                std::cout << "Argumento recibido: [" << arg1 << "]\n"; 
-                std::string contenido = sistema.cat(arg1);
-                std::cout << "Contenido de " << arg1 << ":\n"
+                std::string contenido = sistema.cat(archivo);
+                std::cout << "Contenido de " << archivo << ":\n"
                           << contenido << '\n';
             }
         }
         else if (operacion == "write")
         {
-            stream >> std::quoted(texto) >> arg1;
-            if (arg1.empty() || texto.empty())
+            std::getline(stream, argumento);
+            size_t segundoInicio = argumento.find('<', argumento.find('<') + 1);
+            size_t segundoFin = argumento.find('>', argumento.find('>') + 1);
+            if (segundoInicio == std::string::npos || segundoFin == std::string::npos)
             {
-                std::cerr << "\033[1;31m✘ Error: Formato inválido. Usa: write \"<texto>\" <archivo>\033[0m\n";
+                std::cerr << "\033[1;31m✘ Error: Formato inválido. Usa: write <texto> <archivo>\033[0m\n";
+                continue;
+            }
+
+            std::string texto = extraerTextoEntreAngulos(argumento.substr(0, segundoInicio));
+            std::string archivo = extraerTextoEntreAngulos(argumento.substr(segundoInicio));
+
+            if (texto.empty() || archivo.empty())
+            {
+                std::cerr << "\033[1;31m✘ Error: Ambos argumentos deben estar entre <>.\033[0m\n";
+            }
+            else if (sistema.writeFile(archivo, texto))
+            {
+                std::cout << "\033[1;32m✔ Texto escrito exitosamente en el archivo '" << archivo << "'.\033[0m\n";
             }
             else
             {
-                if (sistema.writeFile(arg1, texto))
-                {
-                    std::cout << "\033[1;32m✔ Texto escrito exitosamente en el archivo '" << arg1 << "'.\033[0m\n";
-                }
-                else
-                {
-                    std::cerr << "\033[1;31m✘ Error al escribir en el archivo.\033[0m\n";
-                }
+                std::cerr << "\033[1;31m✘ Error al escribir en el archivo.\033[0m\n";
             }
         }
         else if (operacion == "rm")
         {
-            stream >> arg1;
-            if (arg1.empty())
+            std::getline(stream, argumento);
+            std::string archivo = extraerTextoEntreAngulos(argumento);
+            if (archivo.empty())
             {
-                std::cerr << "\033[1;31m✘ Error: Debes especificar un archivo.\033[0m\n";
+                std::cerr << "\033[1;31m✘ Error: Formato inválido. Usa: rm <archivo>\033[0m\n";
+            }
+            else if (sistema.deleteFile(archivo))
+            {
+                std::cout << "\033[1;32m✔ Archivo eliminado: " << archivo << "\033[0m\n";
             }
             else
             {
-                if (sistema.deleteFile(arg1))
-                {
-                    std::cout << "\033[1;32m✔ Archivo eliminado: " << arg1 << "\033[0m\n";
-                }
-                else
-                {
-                    std::cerr << "\033[1;31m✘ Error al eliminar el archivo: " << arg1 << "\033[0m\n";
-                }
+                std::cerr << "\033[1;31m✘ Error al eliminar el archivo: " << archivo << "\033[0m\n";
             }
         }
         else if (operacion == "hexdump")
         {
-            stream >> arg1;
-            if (arg1.empty())
+            std::getline(stream, argumento);
+            std::string archivo = extraerTextoEntreAngulos(argumento);
+            if (archivo.empty())
             {
-                std::cerr << "\033[1;31m✘ Error: Debes especificar un archivo.\033[0m\n";
+                std::cerr << "\033[1;31m✘ Error: Formato inválido. Usa: hexdump <archivo>\033[0m\n";
             }
             else
             {
-                std::cout << "Hexdump de " << arg1 << ":\n";
-                std::cout << sistema.hexDump(arg1) << std::endl;
+                std::cout << "Hexdump de " << archivo << ":\n";
+                std::cout << sistema.hexDump(archivo) << std::endl;
             }
         }
         else if (operacion == "copy")
         {
-            std::string direccion, archivoSistema, archivoHost;
+            std::getline(stream, argumento);
 
-            // Leer y validar los argumentos
-            if (!(stream >> direccion >> archivoSistema >> archivoHost))
+            std::istringstream argStream(argumento);
+            std::string direccion, restoArgumentos;
+            argStream >> direccion;
+            std::getline(argStream, restoArgumentos);
+
+            if (direccion != "in" && direccion != "out")
+            {
+                std::cerr << "\033[1;31m✘ Error: Dirección inválida. Usa: copy in <archivo_host> <archivo_sistema> o copy out <archivo_sistema> <archivo_host>\033[0m\n";
+                continue;
+            }
+
+            size_t primerInicio = restoArgumentos.find('<');
+            size_t primerFin = restoArgumentos.find('>');
+            size_t segundoInicio = restoArgumentos.find('<', primerFin + 1);
+            size_t segundoFin = restoArgumentos.find('>', segundoInicio + 1);
+
+            if (primerInicio == std::string::npos || primerFin == std::string::npos ||
+                segundoInicio == std::string::npos || segundoFin == std::string::npos)
             {
                 std::cerr << "\033[1;31m✘ Error: Formato inválido. Usa: copy in <archivo_host> <archivo_sistema> o copy out <archivo_sistema> <archivo_host>\033[0m\n";
-                return;
+                continue;
             }
 
-            archivoSistema.erase(archivoSistema.find_last_not_of(" \t\n\r\f\v") + 1);
-            archivoHost.erase(archivoHost.find_last_not_of(" \t\n\r\f\v") + 1);
+            std::string archivo1 = restoArgumentos.substr(primerInicio + 1, primerFin - primerInicio - 1);
+            std::string archivo2 = restoArgumentos.substr(segundoInicio + 1, segundoFin - segundoInicio - 1);
 
-            if (direccion == "in")
+            if (archivo1.empty() || archivo2.empty())
             {
-                std::string temp = archivoSistema;
-                archivoSistema = archivoHost;
-                archivoHost = temp;
-
-
-                if (sistema.copyIn(archivoHost, archivoSistema))
-                {
-                    std::cout << "\033[1;32m✔ Archivo copiado exitosamente al sistema de archivos.\033[0m\n";
-                }
-                else
-                {
-                    std::cerr << "\033[1;31m✘ Error al copiar el archivo al sistema de archivos.\033[0m\n";
-                }
+                std::cerr << "\033[1;31m✘ Error: Ambos archivos deben estar entre <> y no pueden estar vacíos.\033[0m\n";
+                continue;
             }
-            else if (direccion == "out")
-            {
 
-                if (sistema.copyOut(archivoSistema, archivoHost))
-                {
-                    std::cout << "\033[1;32m✔ Archivo copiado exitosamente al sistema host.\033[0m\n";
-                }
-                else
-                {
-                    std::cerr << "\033[1;31m✘ Error al copiar el archivo al sistema host.\033[0m\n";
-                }
+            if (direccion == "in" && sistema.copyIn(archivo1, archivo2))
+            {
+                std::cout << "\033[1;32m✔ Archivo copiado exitosamente al sistema de archivos.\033[0m\n";
+            }
+            else if (direccion == "out" && sistema.copyOut(archivo1, archivo2))
+            {
+                std::cout << "\033[1;32m✔ Archivo copiado exitosamente al sistema host.\033[0m\n";
             }
             else
             {
-                std::cerr << "\033[1;31m✘ Error: Operación desconocida. Usa 'copy in' o 'copy out'.\033[0m\n";
+                std::cerr << "\033[1;31m✘ Error en la operación de copia.\033[0m\n";
             }
         }
         else if (operacion == "help")
@@ -170,18 +199,17 @@ void interfazComandos(SistemaArchivos &sistema)
             std::cout << "  format                      - Formatea el disco virtual\n";
             std::cout << "  ls                          - Lista los archivos en el sistema\n";
             std::cout << "  cat <archivo>               - Muestra el contenido de un archivo\n";
-            std::cout << "  write \"<texto>\" <archivo>  - Escribe texto en un archivo\n";
+            std::cout << "  write <texto> <archivo>     - Escribe texto en un archivo\n";
             std::cout << "  rm <archivo>                - Elimina un archivo\n";
             std::cout << "  hexdump <archivo>           - Muestra el volcado hexadecimal de un archivo\n";
             std::cout << "  copy in <archivo_host> <archivo_sistema> - Copia un archivo del host al sistema\n";
             std::cout << "  copy out <archivo_sistema> <archivo_host> - Copia un archivo del sistema al host\n";
             std::cout << "  exit                        - Sale del sistema de archivos\n";
-            std::cout << "  back                        - Regresa al sistema de bloques\n";
             std::cout << "-----------------------------\n";
         }
-        else if (operacion == "back")
+        else if (operacion == "exit")
         {
-            std::cout << "Regresando al sistema de bloques...\n";
+            std::cout << "Saliendo del sistema de archivos...\n";
             break;
         }
         else
@@ -279,100 +307,6 @@ int main()
             else
             {
                 std::cout << "\033[1;31m✘ Error al cerrar el dispositivo. Intenta nuevamente.\033[0m\n";
-            }
-        }
-        else if (cmd == "write")
-        {
-            if (!dispositivoAbierto)
-            {
-                std::cout << "\033[1;31m✘ ¡Error! No hay un dispositivo abierto para escribir.\033[0m\n";
-                continue;
-            }
-
-            std::size_t numeroBloque;
-            std::string datos;
-            if (opcion >> numeroBloque)
-            {
-                std::getline(opcion, datos);
-                if (!datos.empty() && datos.front() == '\"' && datos.back() == '\"')
-                {
-                    datos = datos.substr(1, datos.size() - 2);
-                }
-
-                if (!datos.empty())
-                {
-                    std::vector<char> vectorDatos(datos.begin(), datos.end());
-                    if (dispositivo.writeBlock(numeroBloque, vectorDatos))
-                    {
-                        std::cout << "\033[1;31m✘ Datos escritos en el bloque " << numeroBloque << " con éxito.\033[0m\n";
-                    }
-                    else
-                    {
-                        std::cout << "\033[1;31m✘ Error al escribir en el bloque. Verifica el bloque y los datos.\033[0m\n";
-                    }
-                }
-                else
-                {
-                    std::cout << "\033[1;31m✘ Datos vacíos. El formato es: write <numero_bloque> \"<datos_a_escribir>\" \033[0m\n";
-                }
-            }
-            else
-            {
-                std::cout << "\033[1;31m✘ Error, el formato es: write <numero_bloque> \"<datos_a_escribir>\" \033[0m\n";
-            }
-        }
-        else if (cmd == "read")
-        {
-            if (!dispositivoAbierto)
-            {
-                std::cout << "\033[1;31m✘ ¡Error! No hay un dispositivo abierto para leer.\033[0m\n";
-                continue;
-            }
-
-            std::size_t numeroBloque, offset = 0, length = 0;
-            if (opcion >> numeroBloque)
-            {
-                std::string offsetStr, lengthStr;
-
-                if (opcion >> offsetStr)
-                {
-                    try
-                    {
-                        offset = std::stoull(offsetStr);
-                    }
-                    catch (const std::invalid_argument &)
-                    {
-                        std::cout << "\033[1;31m✘ Error: El offset no es válido.\033[0m\n";
-                        continue;
-                    }
-                }
-
-                if (opcion >> lengthStr)
-                {
-                    try
-                    {
-                        length = std::stoull(lengthStr);
-                    }
-                    catch (const std::invalid_argument &)
-                    {
-                        std::cout << "\033[1;31m✘ Error: La longitud no es válida.\033[0m\n";
-                        continue;
-                    }
-                }
-
-                std::string datos = dispositivo.readBlock(numeroBloque, offset, length);
-                if (!datos.empty())
-                {
-                    std::cout << "Datos leídos del bloque " << numeroBloque << ": " << datos << "\n";
-                }
-                else
-                {
-                    std::cout << "\033[1;31m✘ Error al leer del bloque.\033[0m\n";
-                }
-            }
-            else
-            {
-                std::cout << "\033[1;31m✘ Error, el formato es: read <numero_bloque> [offset] [length]\033[0m\n";
             }
         }
         else if (cmd == "info")
