@@ -197,7 +197,7 @@ std::string SistemaArchivos::cat(const std::string &name)
         }
     }
 
-    return texto.empty() ? " \033[31m Error: No se encontró el archivo.\033[0m" : texto;
+    return "" ;
 }
 
 bool SistemaArchivos::copyOut(const std::string &file1, const std::string &file2)

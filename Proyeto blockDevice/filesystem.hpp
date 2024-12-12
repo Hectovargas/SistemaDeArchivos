@@ -65,6 +65,11 @@ public:
             archivo.read(reinterpret_cast<char *>(&Bcount), sizeof(size_t));
             
             superbloqueLong = ceil(16 + Bcount + (256*137)) / Bsize;
+            
+            if(Bcount <= superbloqueLong){
+                std::cout << "blockdevice sin espacio" << std::endl;
+                exit(0);
+            }
 
             fileTable.resize(maxFiles);
             MapaDeBloquesLibres.resize(Bcount);
